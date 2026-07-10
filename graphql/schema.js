@@ -26,6 +26,7 @@ export const typeDefs = `#graphql
     getPosts(limit: Int, offset: Int, authorId: ID, status: String): [Post!]!
     getPost(id: ID!): Post
     getUser(id: ID!): User
+    me: User
   }
 
   type Mutation {
@@ -34,5 +35,6 @@ export const typeDefs = `#graphql
     deletePost(id: ID!): ID
     signup(name: String!, username: String!, password: String!): AuthData!
     login(username: String!, password: String!): AuthData!
+    logout: Boolean
   }
 `;
