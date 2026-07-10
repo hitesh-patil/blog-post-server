@@ -3,6 +3,7 @@ import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@as-integrations/express5';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { typeDefs } from './graphql/schema.js';
@@ -26,25 +27,49 @@ const server = new ApolloServer({
 
 await server.start();
 
+const allowedOrigins = [
+  'http://localhost:5174', 
+  'http://localhost:4000', 
+  'http://13.60.170.186'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+
+app.use(cookieParser());
+
 app.use(
   '/graphql',
-  cors(),
+  cors(corsOptions),
   express.json(),
   expressMiddleware(server, {
-    context: async ({ req }) => {
+    context: async ({ req, res }) => {
       let user = null;
-      const authHeader = req.headers.authorization;
-      if (authHeader) {
-        const token = authHeader.split('Bearer ')[1];
-        if (token) {
-          try {
-            user = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
-          } catch (err) {
-            console.error('JWT Verification Error:', err.message);
-          }
+      let token = req.cookies?.token;
+      
+      if (!token) {
+        const authHeader = req.headers.authorization;
+        if (authHeader) {
+          token = authHeader.split('Bearer ')[1];
         }
       }
-      return { req, user };
+      
+      if (token) {
+        try {
+          user = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
+        } catch (err) {
+          console.error('JWT Verification Error:', err.message);
+        }
+      }
+      return { req, res, user };
     },
   })
 );
