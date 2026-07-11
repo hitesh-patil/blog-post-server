@@ -4,7 +4,10 @@ import jwt from 'jsonwebtoken';
 import { GraphQLError } from 'graphql';
 
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'secret_key', {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not defined.');
+  }
+  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: '7d',
   });
 };
@@ -22,6 +25,8 @@ export const resolvers = {
   Query: {
     getPosts: async (_, { limit = 5, offset = 0, authorId, status }) => {
       try {
+        const safeLimit = Math.min(Math.max(1, limit), 50); // Cap at 50 to prevent abuse
+        const safeOffset = Math.max(0, offset);
         const query = {};
         if (authorId) query.author = authorId;
         if (status) query.status = status;
@@ -29,7 +34,7 @@ export const resolvers = {
           query.$or = [{ status: 'PUBLISHED' }, { status: { $exists: false } }];
         }
 
-        return await Post.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit).populate('author');
+        return await Post.find(query).sort({ createdAt: -1 }).skip(safeOffset).limit(safeLimit).populate('author');
       } catch (error) {
         console.error("GET POSTS ERROR:", error);
         throw new GraphQLError('Error fetching posts', {
@@ -69,6 +74,16 @@ export const resolvers = {
   Mutation: {
     signup: async (_, { name, username, password }, context) => {
       try {
+        if (!name || name.trim().length < 2 || name.length > 50) {
+          throw new GraphQLError('Name must be between 2 and 50 characters', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+        if (!username || username.trim().length < 3 || username.length > 30) {
+          throw new GraphQLError('Username must be between 3 and 30 characters', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+        if (!password || password.length < 6) {
+          throw new GraphQLError('Password must be at least 6 characters', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+
         const existingUser = await User.findOne({ username });
         if (existingUser) {
           throw new GraphQLError('Username is already taken', {
@@ -133,6 +148,10 @@ export const resolvers = {
         });
       }
       try {
+        if (!title || title.trim().length < 3 || title.length > 100) {
+          throw new GraphQLError('Title must be between 3 and 100 characters', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+        
         const newPost = new Post({ 
           title, 
           description, 

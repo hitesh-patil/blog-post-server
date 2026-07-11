@@ -67,6 +67,7 @@ app.use(
           user = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
         } catch (err) {
           console.error('JWT Verification Error:', err.message);
+          res.clearCookie('token');
         }
       }
       return { req, res, user };

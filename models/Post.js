@@ -28,4 +28,8 @@ const postSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Optimize query performance for getPosts
+postSchema.index({ status: 1, createdAt: -1 });
+postSchema.index({ author: 1, createdAt: -1 });
+
 export const Post = mongoose.model('Post', postSchema);
